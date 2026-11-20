@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koku & Steam: The Mitochondrial Village (V6 Bioenergetics & Stress Simulator)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b111e;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .font-serif-jp {
+            font-family: 'Cinzel', serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(217, 119, 6, 0.6);
+            border-radius: 3px;
+        }
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 3px;
+            background: #334155;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #f59e0b;
+            margin-top: -6px;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        .wood-panel {
+            background: linear-gradient(180deg, rgba(24, 24, 27, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
+            border: 1px solid rgba(217, 119, 6, 0.35);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="relative text-slate-100">
+
+    <!-- MAIN ISOMETRIC CANVAS -->
+    <canvas id="isoCanvas"></canvas>
+
+    <!-- TOP TELEMETRY HUD, NON-BLOCKING CRISIS BANNER & STACKED RIGHT-SIDE INSPECTOR -->
+    <header class="fixed top-3 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
+        
+        <!-- Top Row: Title & Live Telemetry Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-2 w-full">
+            <!-- Title & Branding -->
+            <div class="wood-panel px-3.5 py-2 rounded-xl flex items-center gap-3 pointer-events-auto">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 font-serif-jp font-bold text-base shadow-inner">
+                    氣
+                </div>
+                <div>
+                    <h1 class="font-serif-jp text-sm md:text-base font-bold tracking-wider text-amber-400 flex items-center gap-2">
+                        KOKU & STEAM
+                        <span class="text-[10px] font-sans font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">V6 ETC 2.5D</span>
+                    </h1>
+                    <p class="text-[10px] text-slate-400 hidden xl:block">Feudal Japanese Bioenergetics, Redox & Warburg Simulator</p>
+                </div>
+            </div>
+
+            <!-- Live Bioenergetic Metrics -->
+            <div class="wood-panel px-3 py-1.5 rounded-xl flex flex-wrap items-center gap-2.5 md:gap-3 pointer-events-auto text-xs">
+                <!-- Dam Level / ΔΨm -->
+                <div class="flex flex-col min-w-[105px]">
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Dam ($\Delta\Psi_m$)</span>
+                        <span id="hudDamMv" class="font-mono font-bold text-sky-400">165 mV</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 p-0.5">
+                        <div id="hudDamBar" class="h-full bg-gradient-to-r from-sky-500 via-cyan-400 to-rose-500 rounded-full transition-all duration-150" style="width: 45%"></div>
+                    </div>
+                </div>
+
+                <div class="h-6 w-[1px] bg-slate-700/70 hidden sm:block"></div>
+
+                <!-- Koku Minted (ATP) -->
+                <div class="flex items-center gap-1.5">
+                    <div class="w-6 h-6 rounded-lg bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center text-yellow-400 text-xs">
+                        🌾
+                    </div>
+                    <div>
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">Koku (ATP)</div>
+                        <div class="font-mono font-bold text-xs text-yellow-400"><span id="hudAtpRate">0.0</span> <span class="text-[9px] font-normal text-slate-400">/s</span></div>
+                    </div>
+                </div>
+
+                <!-- Onsen Steam (Heat / UCP1) -->
+                <div class="flex items-center gap-1.5">
+                    <div class="w-6 h-6 rounded-lg bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 text-xs">
+                        ♨️
+                    </div>
+                    <div>
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">Onsen (UCP1)</div>
+                        <div class="font-mono font-bold text-xs text-teal-300"><span id="hudHeatRate">0.0</span> <span class="text-[9px] font-normal text-slate-400">kW</span></div>
+                    </div>
+                </div>
+
+                <!-- Ketogenesis (Origami Butterflies / BHB) -->
+                <div class="flex items-center gap-1.5">
+                    <div class="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 text-xs">
+                        🦋
+                    </div>
+                    <div>
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">Ketones</div>
+                        <div class="font-mono font-bold text-xs text-amber-300"><span id="hudKetoneRate">0.0</span> <span class="text-[9px] font-normal text-slate-400">/s</span></div>
+                    </div>
+                </div>
+
+                <!-- GSH Antioxidant Well Reserve -->
+                <div class="flex flex-col min-w-[90px]">
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>GSH Well</span>
+                        <span id="hudGshText" class="font-mono font-bold text-cyan-300">85%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 p-0.5">
+                        <div id="hudGshBar" class="h-full bg-gradient-to-r from-rose-500 via-cyan-400 to-teal-300 rounded-full transition-all duration-150" style="width: 85%"></div>
+                    </div>
+                </div>
+
+                <!-- V4 NEW: ETC Scarring Meter (0% to 100%) -->
+                <div class="flex flex-col min-w-[95px]">
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>ETC Scarring</span>
+                        <span id="hudEtcScarText" class="font-mono font-bold text-slate-300">0%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 p-0.5">
+                        <div id="hudEtcScarBar" class="h-full bg-gradient-to-r from-purple-500 via-fuchsia-400 to-lime-400 rounded-full transition-all duration-150" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- ROS / Path Fires -->
+                <div class="flex items-center gap-1.5">
+                    <div class="w-6 h-6 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 text-xs">
+                        🔥
+                    </div>
+                    <div>
+                        <div class="text-[9px] text-slate-400 uppercase tracking-wider">ROS Stress</div>
+                        <div class="font-mono font-bold text-xs text-rose-400"><span id="hudRosLevel">0</span>%</div>
+                    </div>
+                </div>
+
+                <!-- Adenylate Pool Status (Updated V4: ATP : ADP : AMP with Sky-Blue AMP Segment) -->
+                <div class="flex flex-col min-w-[112px]">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 mb-0.5">
+                        <span class="flex items-center gap-1"><span>⚔️</span><span>ATP:ADP:AMP</span></span>
+                        <span id="hudPoolRatio" class="font-mono font-bold text-emerald-300">14:6:0</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 p-0.5 flex gap-0.5">
+                        <div id="hudAtpBar" class="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-l-full transition-all duration-150" style="width: 70%"></div>
+                        <div id="hudAdpBar" class="h-full bg-slate-500 transition-all duration-150" style="width: 30%"></div>
+                        <div id="hudAmpBar" class="h-full bg-sky-400 shadow-[0_0_6px_#38bdf8] rounded-r-full transition-all duration-150" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Proteostasis Shrine Scaffolding (mTOR Anabolism vs AMPK Autophagy) -->
+                <div class="flex flex-col min-w-[95px]">
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Shrine (mTOR)</span>
+                        <span id="hudScaffoldText" class="font-mono font-bold text-amber-300">25%</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 p-0.5">
+                        <div id="hudScaffoldBar" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-fuchsia-500 rounded-full transition-all duration-150" style="width: 25%"></div>
+                    </div>
+                </div>
+
+                <!-- AMPK / mTOR Yin-Yang Sensor Status -->
+                <div class="flex items-center">
+                    <div id="hudAmpkBadge" class="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 font-medium text-[10px] whitespace-nowrap">
+                        ☯️ Balanced
+                    </div>
+                </div>
+
+                <!-- Randle & GLUT4 Insulin Status Badge -->
+                <div class="flex items-center">
+                    <div id="hudRandleBadge" class="px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-medium text-[10px] whitespace-nowrap">
+                        Gates: Clear
+                    </div>
+                </div>
+
+                <!-- F-08: Hepatic Glycogen & Gluconeogenesis (GNG) Output Readout -->
+                <div class="flex flex-col min-w-[118px] pl-2 border-l border-slate-700/80">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 mb-0.5">
+                        <span class="flex items-center gap-1"><span>🌾</span><span>Glycogen</span></span>
+                        <span id="hudGlycogenText" class="font-mono font-bold text-cyan-300">55%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="hudGlycogenBar" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-400 rounded-full transition-all duration-150" style="width: 55%"></div>
+                    </div>
+                    <div id="hudGngBadge" class="text-[9px] font-semibold text-slate-400 truncate mt-0.5">
+                        GNG: Idle
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- V4 NON-BLOCKING TOP-CENTRE CRISIS BANNER -->
+        <div id="crisisBanner" class="hidden">
+            <div class="flex items-center gap-3">
+                <div id="crisisIcon" class="w-11 h-11 shrink-0 rounded-xl bg-black/30 border border-white/20 flex items-center justify-center text-2xl shadow-inner">
+                    👹
+                </div>
+                <div class="text-left">
+                    <div class="flex items-center gap-2">
+                        <span id="crisisBadge" class="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-black/40 border border-white/20">Pathological State</span>
+                        <h2 id="crisisTitle" class="font-serif-jp text-sm md:text-base font-extrabold tracking-wide">mPTP BREACH & APOPTOSIS</h2>
+                    </div>
+                    <p id="crisisDesc" class="text-[11px] opacity-90 leading-snug mt-0.5">Bioenergetic collapse description.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button id="btnContinueVictory" class="hidden shrink-0 py-2 px-3 rounded-xl font-serif-jp font-bold text-xs bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-lg border border-emerald-200 transition transform hover:scale-[1.02]">
+                    ✨ Continue Playing
+                </button>
+                <button id="btnResetCrisis" class="shrink-0 py-2 px-3.5 rounded-xl font-serif-jp font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg border border-amber-200 transition transform hover:scale-[1.02]">
+                    🔄 Reconstruct Village
+                </button>
+            </div>
+        </div>
+
+        <!-- Second Row (Right-Aligned): Inspector Card & BioConfig Drawer sit cleanly BELOW Telemetry Bar -->
+        <div class="self-end flex flex-col items-end gap-2 max-h-[calc(100vh-250px)] pointer-events-none">
+            <!-- INTERACTIVE INSPECTOR TOOLTIP CARD -->
+            <aside id="inspectorCard" class="w-80 sm:w-96 wood-panel rounded-xl p-3.5 transition-all duration-200 pointer-events-auto overflow-y-auto">
+                <div class="flex items-start justify-between gap-2 border-b border-slate-700/80 pb-2 mb-2">
+                    <div>
+                        <span id="inspTag" class="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Landmark Selected</span>
+                        <h2 id="inspTitle" class="font-serif-jp text-sm font-bold text-white mt-1">The Mitochondrial Village (V6)</h2>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button id="btnInlineToggleExpl" class="text-[10px] text-cyan-300 hover:text-white px-2 py-0.5 rounded bg-slate-800/90 border border-slate-700 transition" title="Collapse or Expand Explanation Text">
+                            Hide Details ▲
+                        </button>
+                        <button id="btnCloseInspector" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800">✕</button>
+                    </div>
+                </div>
+                <div id="inspectorBody" class="space-y-2 text-xs leading-relaxed">
+                    <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-0.5">🏯 Village Metaphor</div>
+                        <p id="inspMetaphor" class="text-slate-300">Click on any building, bridge, water wheel, cart, or villager in the field to inspect how the feudal Japanese village maps to cellular bioenergetics, Xenobiotic Bandit defense, and Warburg fermentation.</p>
+                    </div>
+                    <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-cyan-400 mb-0.5">🧬 Mitochondrial Biochemistry</div>
+                        <p id="inspBiology" class="text-slate-300">Electrons step down from Tawara rice bales through CoQ flour sacks and Cytochrome c mochi dough balls into the paired 4-chamber Copper & Iron Kiln-Press at Complex IV.</p>
+                    </div>
+                </div>
+                <div id="inspLiveStat" class="text-[10px] font-mono text-emerald-400 pt-1.5 border-t border-slate-800 mt-1.5">
+                    Tip: Drag to pan, scroll to zoom, or select a Scenario Preset below.
+                </div>
+            </aside>
+
+            <!-- COLLAPSIBLE BIOCONFIG STOICHIOMETRY DRAWER -->
+            <aside id="configDrawer" class="hidden w-80 wood-panel rounded-xl p-3.5 transition-all duration-200 pointer-events-auto overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-slate-700/80 pb-2 mb-2.5">
+                    <div>
+                        <h3 class="font-serif-jp text-xs font-bold text-amber-400">BioConfig Stoichiometry</h3>
+                        <p class="text-[10px] text-slate-400">Live Tunable Biochemical Multipliers</p>
+                    </div>
+                    <button id="btnCloseConfig" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-slate-800">✕</button>
+                </div>
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300">Fat $\rightarrow$ Glc Inhibition (Citrate/PDH)</span>
+                            <span id="cfgRandleVal" class="font-mono text-amber-400">0.65</span>
+                        </div>
+                        <input id="cfgRandle" type="range" min="0.0" max="1.0" step="0.05" value="0.65" class="w-full">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300">Glc $\rightarrow$ Fat Inhibition (Malonyl-CoA)</span>
+                            <span id="cfgMalonylVal" class="font-mono text-blue-400">0.70</span>
+                        </div>
+                        <input id="cfgMalonyl" type="range" min="0.0" max="1.0" step="0.05" value="0.70" class="w-full">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300">AMPK Ninja Boost Strength</span>
+                            <span id="cfgNinjaBoostVal" class="font-mono text-purple-400">+5%</span>
+                        </div>
+                        <input id="cfgNinjaBoost" type="range" min="0" max="15" step="1" value="5" class="w-full">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300">Ronin Patience Limit</span>
+                            <span id="cfgRoninWaitVal" class="font-mono text-red-400">6.5s</span>
+                        </div>
+                        <input id="cfgRoninWait" type="range" min="2.0" max="12.0" step="0.5" value="6.5" class="w-full">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <span class="text-slate-300">mTOR Monk Build Speed</span>
+                            <span id="cfgMtorSpeedVal" class="font-mono text-amber-300">1.0x</span>
+                        </div>
+                        <input id="cfgMtorSpeed" type="range" min="0.3" max="2.5" step="0.1" value="1.0" class="w-full">
+                    </div>
+                    <button id="btnResetConfig" class="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition border border-slate-700">
+                        Reset Default Stoichiometry
+                    </button>
+                </div>
+            </aside>
+        </div>
+    </header>
+
+    <!-- Hidden Legacy Overlays (Replaced in V4 by Non-Blocking #crisisBanner) -->
+    <div id="apoptosisOverlay" class="hidden">
+        <button id="btnResetApoptosis"></button>
+    </div>
+    <div id="senescenceOverlay" class="hidden">
+        <button id="btnResetSenescence"></button>
+    </div>
+
+    <!-- BOTTOM CONTROL DECK & LOWER-LEFT FLOATING UI TOOLBAR -->
+    <footer class="fixed bottom-3 left-3 right-3 z-20 flex flex-col gap-2 pointer-events-none">
+        
+        <!-- Lower-Left Floating UI Action Toolbar -->
+        <div class="flex flex-wrap items-center gap-1.5 pointer-events-auto self-start">
+            <button id="btnToggleLabels" class="wood-panel px-3 py-2 rounded-xl text-xs font-medium text-amber-300 border-amber-500/40 hover:text-white hover:border-amber-400/60 transition flex items-center gap-1.5" title="Show or Hide All 3D Village Labels">
+                🏷️ <span id="lblToggleLabelsText">Labels: OFF</span>
+            </button>
+            <button id="btnToggleExplanation" class="wood-panel px-3 py-2 rounded-xl text-xs font-medium text-cyan-300 border-cyan-500/40 hover:text-white hover:border-cyan-400/60 transition flex items-center gap-1.5" title="Show or Hide Detailed Explanations">
+                📖 <span id="lblToggleExplText">Explanations: ON</span>
+            </button>
+            <button id="btnResetCam" class="wood-panel px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:border-amber-400/60 transition flex items-center gap-1.5" title="Centre Camera">
+                🎯 <span>Centre View</span>
+            </button>
+            <button id="btnPressPulse" class="hidden wood-panel px-3 py-2 rounded-xl text-xs font-semibold text-fuchsia-300 border-fuchsia-500/50 hover:bg-fuchsia-950/60 hover:border-fuchsia-400 transition flex items-center gap-1.5" title="Pulse Therapy: Empty the Succinate basket & strike Wellhouse mSLP (Requires Press: Glucose < 10%, Fat > 80%, Toxin < 5%)">
+                ⚡ <span id="lblPressPulseText">Pulse</span>
+            </button>
+            <button id="btnToggleConfig" class="wood-panel px-3 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:bg-amber-950/50 hover:border-amber-400 transition flex items-center gap-1.5">
+                ⚙️ <span>BioConfig</span>
+            </button>
+        </div>
+
+        <div class="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5">
+        <!-- Substrate, Demand & Toxin Sliders (6 cards in V4) -->
+        <div class="wood-panel px-3.5 py-2.5 rounded-xl flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 pointer-events-auto">
+            
+            <!-- Fatty Acid Slider -->
+            <div class="flex flex-col justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/80">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="sliderFat" class="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                        <span>🥓</span> Fat ($\beta$-Ox)
+                    </label>
+                    <span id="valFat" class="font-mono text-xs font-bold text-amber-300">35%</span>
+                </div>
+                <input id="sliderFat" type="range" min="0" max="100" value="35" class="w-full my-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                    <span>Tawara Bales</span>
+                    <span id="lblFatEffective" class="text-amber-300/80">Effective: 35%</span>
+                </div>
+            </div>
+
+            <!-- Glucose Slider -->
+            <div class="flex flex-col justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/80">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="sliderGlucose" class="text-xs font-semibold text-blue-400 flex items-center gap-1">
+                        <span>🍚</span> Glucose
+                    </label>
+                    <span id="valGlucose" class="font-mono text-xs font-bold text-blue-300">40%</span>
+                </div>
+                <input id="sliderGlucose" type="range" min="0" max="100" value="40" class="w-full my-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                    <span>Cytosol Fence</span>
+                    <span id="lblGlucEffective" class="text-blue-300/80">Effective: 40%</span>
+                </div>
+            </div>
+
+            <!-- Samurai Demand Slider -->
+            <div class="flex flex-col justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/80">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="sliderDemand" class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                        <span>⚔️</span> Workload
+                    </label>
+                    <span id="valDemand" class="font-mono text-xs font-bold text-emerald-300">55%</span>
+                </div>
+                <input id="sliderDemand" type="range" min="0" max="100" value="55" class="w-full my-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                    <span>20-Samurai</span>
+                    <span id="lblGarrisonCrisis" class="text-emerald-300/80">Stable Cycling</span>
+                </div>
+            </div>
+
+            <!-- Antioxidant Synthesis Slider -->
+            <div class="flex flex-col justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/80">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="sliderAntiox" class="text-xs font-semibold text-cyan-400 flex items-center gap-1">
+                        <span>🪣</span> Antioxidant
+                    </label>
+                    <span id="valAntiox" class="font-mono text-xs font-bold text-cyan-300">65%</span>
+                </div>
+                <input id="sliderAntiox" type="range" min="0" max="100" value="65" class="w-full my-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                    <span>GSH Well</span>
+                    <span id="lblBrigadeStatus" class="text-cyan-300/80">Ready</span>
+                </div>
+            </div>
+
+            <!-- V4 NEW: Toxin / Banditry Slider -->
+            <div class="flex flex-col justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/80">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="sliderToxin" class="text-xs font-semibold text-lime-400 flex items-center gap-1">
+                        <span>🧪</span> Toxin / Bandits
+                    </label>
+                    <span id="valToxin" class="font-mono text-xs font-bold text-lime-300">0%</span>
+                </div>
+                <input id="sliderToxin" type="range" min="0" max="100" value="0" class="w-full my-1">
+                <div class="flex justify-between text-[10px] text-slate-400">
+                    <span>Xenobiotics</span>
+                    <span id="lblBanditStatus" class="text-lime-300/80">Trail Clear</span>
+                </div>
+            </div>
+
+            <!-- Onsen Sluice (UCP1) Toggle -->
+            <div class="flex flex-col justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800/80">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-semibold text-teal-300 flex items-center gap-1">
+                        <span>♨️</span> Onsen (UCP1)
+                    </span>
+                    <span id="statusSluice" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">CLOSED</span>
+                </div>
+                <button id="btnToggleSluice" class="mt-1 w-full py-1.5 px-2 rounded-lg font-semibold text-xs bg-slate-800 hover:bg-teal-950 text-slate-200 hover:text-teal-200 border border-slate-700 hover:border-teal-500/50 transition flex items-center justify-center gap-1">
+                    <span id="sluiceBtnText">Open Spillway</span>
+                </button>
+                <div class="text-[10px] text-slate-400 text-center mt-0.5">
+                    Vents Dam Steam
+                </div>
+            </div>
+        </div>
+
+        <!-- Scenario Presets (Includes V4 Chronic Warburg & Acute Necrosis) -->
+        <div class="wood-panel px-3.5 py-2.5 rounded-xl flex flex-col justify-between pointer-events-auto xl:w-96">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400/90 mb-1.5 flex items-center justify-between">
+                <span>⚡ Physiological & Pathological Scenarios</span>
+                <span class="text-[9px] text-slate-400 font-normal">Click to load</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-1.5 text-[11px]">
+                <button id="btnPresetFasted" data-preset="fasted" class="preset-btn px-2 py-1 rounded bg-slate-800/90 hover:bg-amber-500/20 border border-slate-700 hover:border-amber-500/50 text-left truncate transition">
+                    🥑 Balanced Fasting (Ketones)
+                </button>
+                <button data-preset="exercise" class="preset-btn px-2 py-1 rounded bg-slate-800/90 hover:bg-emerald-500/20 border border-slate-700 hover:border-emerald-500/50 text-left truncate transition">
+                    🏃 High Workload (AMPK)
+                </button>
+                <button data-preset="warburg" class="preset-btn px-2 py-1 rounded bg-slate-800/90 hover:bg-lime-500/20 border border-slate-700 hover:border-lime-500/50 text-left truncate transition text-lime-300">
+                    🧟 Chronic Bandits (Warburg)
+                </button>
+                <button data-preset="necrosis" class="preset-btn px-2 py-1 rounded bg-slate-800/90 hover:bg-rose-500/20 border border-slate-700 hover:border-rose-500/50 text-left truncate transition text-rose-300">
+                    ☠️ Acute Toxin Surge (Necrosis)
+                </button>
+                <button data-preset="starvation" class="preset-btn px-2 py-1 rounded bg-slate-800/90 hover:bg-red-500/20 border border-slate-700 hover:border-red-500/50 text-left truncate transition text-red-300">
+                    👹 Energy Starvation (mPTP)
+                </button>
+                <button id="btnPresetOverfed" data-preset="overfed" class="preset-btn px-2 py-1 rounded bg-slate-800/90 hover:bg-orange-500/20 border border-slate-700 hover:border-orange-500/50 text-left truncate transition text-orange-200">
+                    🍱 Sedentary Overfed (State 4)
+                </button>
+            </div>
+        </div>
+        </div>
+    </footer>
+
+    <!-- V3 IMMUTABLE VISUAL FOUNDATION & CORE ENGINE -->
+    <script src="v3_core.js"></script>
+    <!-- V4 EXPANSION MODULE -->
+    <script src="v4_expansion.js"></script>
+</body>
+</html>
