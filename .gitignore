@@ -1,0 +1,5 @@
+# Agent conversation logs and system artifacts
+conversation_logs/
+.DS_Store
+*.swp
+*~
